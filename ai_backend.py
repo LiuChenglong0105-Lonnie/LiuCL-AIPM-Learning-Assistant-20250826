@@ -3,19 +3,12 @@ import os
 import datetime
 import time
 import uuid
+# 1. 替换依赖：删除原火山SDK导入，新增openai导入
+from openai import OpenAI
+from openai import APIError, APIConnectionError, RateLimitError  # 导入openai常见异常
 
-# 尝试导入火山引擎SDK，如果失败则使用模拟实现
-ARK_AVAILABLE = False
-try:
-    from volcenginesdkarkruntime import Ark
-    ARK_AVAILABLE = True
-    print("成功导入火山引擎SDK")
-except ImportError:
-    print("无法导入火山引擎SDK，将使用模拟实现")
-
-# 定义AI产品经理面试回答指南作为基础prompt
+# 定义AI产品经理面试回答指南作为基础prompt（保持不变）
 AI_PRODUCT_MANAGER_PROMPT = """你是一名非常资深的AI产品经理。我是一个正在进行AI产品求职的人。我会向你请教一系列AI产品经理面试问题，希望你能结合 AI 产品的特性、行业实践和自身对岗位的理解，给出逻辑清晰、内容详实且有深度的回答。
-
 回答时请遵循以下原则：
 只需要进行问题的回答，无需寒暄客套。
 字数限制在2000字以内;
@@ -24,165 +17,129 @@ AI_PRODUCT_MANAGER_PROMPT = """你是一名非常资深的AI产品经理。我�
 产品思维：必须有产品经理必备的思维（如用户需求分析、产品定位、迭代策略等）；
 商业思维：如果涉及实际业务应用，需要考虑落地性、商业化等问题，体现出商业思维。
 表达：语言简洁，用词专业，结构化，采用 "观点 + 分析 " 的模式，先用核心观点回应，再分点展开分析。
-案例：如果只讨论理论不足以解释问题，必要时课结合过往经验或行业案例佐证（可合理虚构符合逻辑的经历）；
+案例：如果只讨论理论不足以解释问题，必要时可结合过往经验或行业案例佐证（可合理虚构符合逻辑的经历）；
 前瞻性：在回答中体现对 AI 产品发展趋势的思考，如AI产品体验与比较、技术与场景的结合、用户体验的优化方向、伦理合规等潜在问题的应对思路；
 """
 
-# 模拟的Ark类，用于在无法导入真实SDK时提供基本功能
+# 2. 简化MockArk：仅保留模拟回答功能（删除原SDK兼容逻辑）
 class MockArk:
-    def __init__(self, base_url=None, api_key=None):
-        self.base_url = base_url
-        self.api_key = api_key
-        
-    class Chat:  # 类名从ChatCompletions改为Chat
-        def create(self, model, messages, max_tokens=3000, temperature=0.8):
-            # 保持原有实现不变
-            class MockResponse:
-                class Choices:
-                    class Message:
-                        def __init__(self):
-                            self.content = "当前环境无法连接到AI服务。这是一个示例回答，展示了AI产品经理学习助手的基本功能。\n\n请配置环境变量ARK_API_KEY以获取完整的AI回答能力。"
-                
-                def __init__(self):
-                    # 直接引用内部定义的Message类
-                    self.message = MockResponse.Choices.Message()
-                
-                @property
-                def choices(self):
-                    return [self]
-                
-            # 创建并返回MockResponse实例
-            response = MockResponse()
-            return response
-    
-    @property
     def chat(self):
-        return self.Chat()  # 返回Chat类实例而非ChatCompletions
+        class ChatCompletions:
+            def create(self, model, messages, max_tokens=3000, temperature=0.8):
+                # 模拟回答（保持原提示文案）
+                class MockResponse:
+                    class Choices:
+                        def __init__(self):
+                            self.message = type('obj', (), {'content': "当前环境无法连接到AI服务。这是一个示例回答，展示了AI产品经理学习助手的基本功能。\n\n请配置环境变量ARK_API_KEY以获取完整的AI回答能力。"})
+                        @property
+                        def choices(self):
+                            return [self]
+                return MockResponse.Choices()
+        return ChatCompletions()
 
 class AIClient:
     def __init__(self, model_name='doubao-seed-1-6-250615'):
-        """初始化AI客户端，只从环境变量获取API密钥，确保密钥安全"""
-        # 仅从环境变量获取API密钥，彻底避免硬编码风险
+        """初始化OpenAI客户端（适配ARK服务），从环境变量获取API密钥"""
         self.api_key = os.environ.get('ARK_API_KEY')
         self.model_name = model_name
         self.client = None
-        self.initialize_client()
-        
+        self.initialize_client()  # 初始化客户端（真实/模拟）
+    
     def initialize_client(self):
-        """初始化客户端（真实或模拟）"""
+        """3. 初始化客户端：改用openai.OpenAI，失败则用模拟客户端"""
         try:
-            if ARK_AVAILABLE and self.api_key:
-                self.client = Ark(
-                    base_url="https://ark.cn-beijing.volces.com/api/v3",
+            # 若有API密钥，初始化真实OpenAI客户端（指向ARK服务）
+            if self.api_key:
+                self.client = OpenAI(
+                    base_url="https://ark.cn-beijing.volces.com/api/v3",  # ARK的OpenAI兼容接口地址
                     api_key=self.api_key
                 )
-                print("AI客户端初始化成功")
+                print("OpenAI客户端（适配ARK）初始化成功")
             else:
-                # 使用模拟客户端
+                # 无密钥，使用模拟客户端
                 self.client = MockArk()
-                print("使用模拟AI客户端")
+                print("使用模拟AI客户端（未配置ARK_API_KEY）")
         except Exception as e:
-            print(f"初始化AI客户端失败: {str(e)}")
+            print(f"初始化客户端失败: {str(e)}")
             self.client = MockArk()
     
     def generate_answer(self, question, category="AI产品经理面试", max_retries=3):
-        """
-        生成AI回答
-        参数:
-            question: 用户的问题
-            category: 问题类别
-            max_retries: 最大重试次数
-        返回:
-            tuple: (成功标志, 回答内容/错误信息)
-        """
+        """4. 生成回答：适配openai库的调用格式"""
         if not self.client:
             self.initialize_client()
             if not self.client:
                 return False, "无法初始化AI客户端，请检查API密钥是否正确"
         
         retries = 0
-        
         while retries < max_retries:
             try:
                 print(f"处理问题: {question}")
-                
-                # 构建提示词
+                # 构建提示词（保持原逻辑，确保回答符合AI产品经理指南）
                 prompt = f"{AI_PRODUCT_MANAGER_PROMPT}\n\n类别: {category}\n问题: {question}"
                 
-                response = self.client.chat.create(  # 移除了中间的completions层级
-                    model=self.model_name,
+                # 调用ARK服务（适配openai的chat.completions.create参数）
+                response = self.client.chat.completions.create(
+                    model=self.model_name,  # ARK的推理接入点ID（不变）
                     messages=[
                         {
                             "role": "user",
-                            "content": [
-                                {"type": "text", "text": prompt}
-                            ]
+                            "content": [{"type": "text", "text": prompt}]  # 仅文本输入，删除原示例中的image_url
                         }
                     ],
-                    max_tokens=3000,
-                    temperature=0.8
+                    max_tokens=3000,  # 保持原配置
+                    temperature=0.8   # 保持原配置（控制回答随机性）
                 )
                 
-                # 提取答案
-                answer = response.choices[0].message.content
-                
+                # 提取回答（适配openai的响应格式）
+                answer = response.message.content
                 return True, answer
                 
-            except Exception as e:
+            # 5. 异常处理：捕获openai库的常见异常（重试逻辑不变）
+            except (APIError, APIConnectionError, RateLimitError) as e:
                 retries += 1
-                error_msg = f"调用API失败 (尝试 {retries}/{max_retries}): {str(e)}"
+                error_msg = f"调用ARK服务失败 (尝试 {retries}/{max_retries}): {str(e)}"
                 print(error_msg)
-                
                 if retries >= max_retries:
                     return False, error_msg
-                # 指数退避重试
+                time.sleep(2 ** retries)  # 指数退避重试
+            except Exception as e:
+                retries += 1
+                error_msg = f"未知错误 (尝试 {retries}/{max_retries}): {str(e)}"
+                print(error_msg)
+                if retries >= max_retries:
+                    return False, error_msg
                 time.sleep(2 ** retries)
 
+# QA保存器（完全不变，保留原功能）
 class QASaver:
     def __init__(self, data_file="questions&answers.json"):
-        """初始化QA保存器"""
         self.data_file = data_file
         self.initialize_data_file()
     
     def initialize_data_file(self):
-        """初始化数据文件"""
         if not os.path.exists(self.data_file):
-            initial_data = []
             with open(self.data_file, "w", encoding="utf-8") as f:
-                json.dump(initial_data, f, ensure_ascii=False, indent=2)
+                json.dump([], f, ensure_ascii=False, indent=2)
         else:
-            # 尝试读取现有文件，如果格式错误则重新初始化
             try:
                 with open(self.data_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                # 确保数据是列表格式
                 if not isinstance(data, list):
                     data = []
-                # 保存更新后的数据
                 with open(self.data_file, "w", encoding="utf-8") as f:
                     json.dump(data, f, ensure_ascii=False, indent=2)
             except json.JSONDecodeError:
-                # 文件格式错误，重新初始化
-                initial_data = []
                 with open(self.data_file, "w", encoding="utf-8") as f:
-                    json.dump(initial_data, f, ensure_ascii=False, indent=2)
-        
+                    json.dump([], f, ensure_ascii=False, indent=2)
+    
     def save_qa(self, question, answer, category):
-        """保存问题和答案"""
         try:
-            # 读取现有数据
             with open(self.data_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            
-            # 确保data是列表格式
             if not isinstance(data, list):
                 data = []
-            
-            # 生成唯一ID
             current_time = int(time.time())
             qa_id = f"q_{len(data)}_{current_time}"
-            
-            # 创建新的问答项，遵循现有格式
             new_qa = {
                 "id": qa_id,
                 "category": category,
@@ -190,29 +147,22 @@ class QASaver:
                 "status": "completed",
                 "answer": answer
             }
-            
-            # 添加到数据列表
             data.append(new_qa)
-            
-            # 保存数据
             with open(self.data_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-            
             return True, f"问答已保存到 '{category}' 分类"
-            
         except Exception as e:
             return False, f"保存问答失败: {str(e)}"
 
-# 单例模式，方便app.py调用
-aiclient = AIClient()  # 不再传入api_key参数，构造函数会自动从环境变量获取
+# 单例模式（不变，供app.py调用）
+aiclient = AIClient()
 qasaver = QASaver()
 
+# 测试代码（可选，本地运行验证）
 if __name__ == "__main__":
-    # 测试代码
     success, result = aiclient.generate_answer("什么是AI产品经理？", "技术原理与基础概念")
     if success:
         print(f"AI回答:\n{result}")
-        # 测试保存功能
         save_success, save_msg = qasaver.save_qa("什么是AI产品经理？", result, "技术原理与基础概念")
         print(save_msg)
     else:
