@@ -10,9 +10,8 @@ import uuid
 import sys
 import time
 
-# 先加载.env文件中的环境变量
-from dotenv import load_dotenv
-load_dotenv()
+# 注意：在Streamlit Cloud环境中，API密钥通过secrets提供，而不是.env文件
+# 以下代码已优化以适应Streamlit Cloud环境
 
 # 尝试导入ai_backend模块，如果失败提供替代方案
 class MockAIClient:
