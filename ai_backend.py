@@ -3,12 +3,10 @@ import os
 import datetime
 import time
 import uuid
-from dotenv import load_dotenv
 from openai import OpenAI
 from openai import APIError, APIConnectionError, RateLimitError  # 导入openai常见异常
 
-# 加载.env文件中的环境变量
-load_dotenv()
+# 注意：在Streamlit Cloud环境中，API密钥通过secrets提供
 
 # 定义AI产品经理面试回答指南作为基础prompt（保持不变）
 AI_PRODUCT_MANAGER_PROMPT = """你是一名非常资深的AI产品经理。我是一个正在进行AI产品求职的人。我会向你请教一系列AI产品经理面试问题，希望你能结合 AI 产品的特性、行业实践和自身对岗位的理解，给出逻辑清晰、内容详实且有深度的回答。
