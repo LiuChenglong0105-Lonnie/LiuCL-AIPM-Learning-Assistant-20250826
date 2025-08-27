@@ -36,15 +36,6 @@ try:
     st.session_state["has_api_key"] = has_api_key
     st.session_state["aiclient_type"] = type(aiclient).__name__  # 记录aiclient的类型以便调试
     
-    # 显示API密钥状态提示
-    if has_api_key:
-        st.sidebar.success(f"🔑 API密钥已配置")
-        # 在侧边栏显示更详细的状态信息
-        with st.sidebar.expander("🔧 系统状态信息"):
-            st.info(f"当前使用的aiclient类型: {st.session_state.get('aiclient_type', '未知')}")
-            st.info(f"API密钥长度: {len(os.environ.get('ARK_API_KEY', ''))} 字符")
-    else:
-        st.sidebar.warning("⚠️ 未配置API密钥，将使用示例回答\n\n部署到Streamlit Cloud时，请在设置中添加环境变量ARK_API_KEY")
 except ImportError as e:
     st.warning(f"无法导入ai_backend模块: {str(e)}，将使用基础功能模式")
     # 使用模拟对象
