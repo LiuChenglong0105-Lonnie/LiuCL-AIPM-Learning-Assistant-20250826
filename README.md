@@ -1,5 +1,5 @@
 # AI产品经理学习助手
-
+Streamlit在线链接：https://liucl-ai-pm-learning-assistant-20250827-5hcvkexnytrxapppphyyb.streamlit.app/
 一个为AI产品经理设计的学习辅助工具，帮助用户提问、获取AI回答并保存学习卡片。
 
 ## 功能特性
